@@ -170,9 +170,6 @@ class BaseGravity(CountModel):
             Lag=None,
             Quasi=False):
 
-        print(flows.shape)
-        print(costs.shape)
-
         n = User.check_arrays(flows, costs)
         #User.check_y(flows, n)
         self.n = n
@@ -202,16 +199,19 @@ class BaseGravity(CountModel):
             X = np.empty((self.n, 0))
         else:
             X = sp.csr_matrix((self.n, 1))
+        
         if isinstance(self, Production) | isinstance(self, Doubly):
             o_dummies = spcategorical(origins.flatten())
             if constant:
                 o_dummies = o_dummies[:, 1:]
             X = sphstack(X, o_dummies, array_out=False)
+        
         if isinstance(self, Attraction) | isinstance(self, Doubly):
             d_dummies = spcategorical(destinations.flatten())
             if constant | isinstance(self, Doubly):
                 d_dummies = d_dummies[:, 1:]
             X = sphstack(X, d_dummies, array_out=False)
+        
         if self.ov is not None:
             if isinstance(self, Gravity):
                 for each in range(self.ov.shape[1]):
@@ -234,6 +234,7 @@ class BaseGravity(CountModel):
                     ov = sp.csr_matrix(
                         np.log(np.reshape(self.ov[:, each], ((-1, 1)))))
                     X = sphstack(X, ov, array_out=False)
+        
         if self.dv is not None:
             if isinstance(self, Gravity):
                 for each in range(self.dv.shape[1]):
@@ -256,9 +257,20 @@ class BaseGravity(CountModel):
                     dv = sp.csr_matrix(
                         np.log(np.reshape(self.dv[:, each], ((-1, 1)))))
                     X = sphstack(X, dv, array_out=False)
+        
         if isinstance(self, Gravity):
-            # X = np.hstack((X, self.cf(np.reshape(self.c, (-1, 1))))) # Removed to accomodate multiple cost vars
-            X = np.hstack((X, self.cf(self.c)))
+            for each in range(self.c.shape[1]):
+                if (self.c[:, each] == 0).any():
+                    raise ValueError(
+                        "Zero values detected in column %s "
+                        "of cost variables, which are undefined for "
+                        "Poisson log-linear spatial interaction models" %
+                        each)
+                X = np.hstack(
+                    (X, self.cf(np.reshape(self.c[:, each], (-1, 1)))))
+
+            # X = np.hstack((X, self.cf(self.c)))
+        
         else:
             c = sp.csr_matrix(self.cf(np.reshape(self.c, (-1, 1))))
             X = sphstack(X, c, array_out=False)
@@ -461,6 +473,10 @@ class Gravity(BaseGravity):
         else:
             p = 1
         self.dv = np.reshape(d_vars, (-1, p))
+        if len(costs.shape) > 1:
+            p = costs.shape[1]
+        else:
+            p = 1
         self.c = np.reshape(costs, (-1, p))
         
         #User.check_arrays(self.f, self.ov, self.dv, self.c)
