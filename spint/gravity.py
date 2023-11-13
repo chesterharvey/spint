@@ -157,7 +157,7 @@ class BaseGravity(CountModel):
     def __init__(
             self,
             flows,
-            cost,
+            costs,
             cost_func='pow',
             o_vars=None,
             d_vars=None,
@@ -169,11 +169,15 @@ class BaseGravity(CountModel):
             CD=None,
             Lag=None,
             Quasi=False):
-        n = User.check_arrays(flows, cost)
+
+        print(flows.shape)
+        print(costs.shape)
+
+        n = User.check_arrays(flows, costs)
         #User.check_y(flows, n)
         self.n = n
         self.f = flows
-        self.c = cost
+        self.c = costs
         self.ov = o_vars
         self.dv = d_vars
         if isinstance(cost_func, str):
@@ -253,7 +257,8 @@ class BaseGravity(CountModel):
                         np.log(np.reshape(self.dv[:, each], ((-1, 1)))))
                     X = sphstack(X, dv, array_out=False)
         if isinstance(self, Gravity):
-            X = np.hstack((X, self.cf(np.reshape(self.c, (-1, 1)))))
+            # X = np.hstack((X, self.cf(np.reshape(self.c, (-1, 1))))) # Removed to accomodate multiple cost vars
+            X = np.hstack((X, self.cf(self.c)))
         else:
             c = sp.csr_matrix(self.cf(np.reshape(self.c, (-1, 1))))
             X = sphstack(X, c, array_out=False)
@@ -325,8 +330,8 @@ class Gravity(BaseGravity):
     ----------
     flows           : array of integers
                       n x 1; observed flows between O origins and D destinations
-    cost            : array
-                      n x 1; cost to overcome separation between each origin and
+    costs            : array
+                      n x p; cost to overcome separation between each origin and
                       destination associated with a flow; typically distance or time
     cost_func       : string or function that has scalar input and output
                       functional form of the cost function;
@@ -370,7 +375,7 @@ class Gravity(BaseGravity):
     k               : integer
                       number of parameters
     c               : array
-                      n x 1; cost to overcome separation between each origin and
+                      n x p; costs to overcome separation between each origin and
                       destination associated with a flow; typically distance or time
     cf              : function
                       cost function; used to transform cost variable
@@ -432,7 +437,7 @@ class Gravity(BaseGravity):
     >>> import libpysal
     >>> from spint.gravity import Gravity
     >>> db = libpysal.io.open(libpysal.examples.get_path('nyc_bikes_ct.csv'))
-    >>> cost = np.array(db.by_col('tripduration')).reshape((-1,1))
+    >>> costs = np.array(db.by_col('tripduration')).reshape((-1,1))
     >>> flows = np.array(db.by_col('count')).reshape((-1,1))
     >>> o_cap = np.array(db.by_col('o_cap')).reshape((-1,1))
     >>> d_cap = np.array(db.by_col('d_cap')).reshape((-1,1))
@@ -442,7 +447,7 @@ class Gravity(BaseGravity):
 
     """
 
-    def __init__(self, flows, o_vars, d_vars, cost,
+    def __init__(self, flows, o_vars, d_vars, costs,
                  cost_func, constant=True, framework='GLM', SF=None, CD=None,
                  Lag=None, Quasi=False):
         self.f = np.reshape(flows, (-1, 1))
@@ -456,7 +461,8 @@ class Gravity(BaseGravity):
         else:
             p = 1
         self.dv = np.reshape(d_vars, (-1, p))
-        self.c = np.reshape(cost, (-1, 1))
+        self.c = np.reshape(costs, (-1, p))
+        
         #User.check_arrays(self.f, self.ov, self.dv, self.c)
 
         BaseGravity.__init__(
